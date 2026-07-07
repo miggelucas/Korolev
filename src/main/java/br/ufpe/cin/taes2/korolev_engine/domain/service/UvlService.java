@@ -1,6 +1,7 @@
 package br.ufpe.cin.taes2.korolev_engine.domain.service;
 
 import br.ufpe.cin.taes2.korolev_engine.domain.model.FeatureFlag;
+import br.ufpe.cin.taes2.korolev_engine.domain.service.engine.KorolevEngine;
 import br.ufpe.cin.taes2.korolev_engine.infrastructure.repository.FeatureFlagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

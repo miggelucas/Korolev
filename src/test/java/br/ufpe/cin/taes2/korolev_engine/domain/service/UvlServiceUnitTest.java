@@ -1,6 +1,8 @@
 package br.ufpe.cin.taes2.korolev_engine.domain.service;
 
 import br.ufpe.cin.taes2.korolev_engine.domain.model.FeatureFlag;
+import br.ufpe.cin.taes2.korolev_engine.domain.service.engine.KorolevEngine;
+import br.ufpe.cin.taes2.korolev_engine.infrastructure.repository.FeatureFlagRepository;
 import br.ufpe.cin.taes2.korolev_engine.infrastructure.repository.InMemoryFeatureFlagRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

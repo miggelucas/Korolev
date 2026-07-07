@@ -47,8 +47,8 @@ public class DemoDataInitializer implements ApplicationRunner {
         flags.add(FeatureFlag.builder().name("Mortgage_Loan").parentName("Loan_System").active(false).build());
         flags.add(FeatureFlag.builder().name("Payroll_Loan").parentName("Loan_System").active(true).build());
 
-        // 1. Generate 30 Risk Rules inside Risk_Engine
-        for (int i = 1; i <= 30; i++) {
+        // 1. Generate 1000 Risk Rules inside Risk_Engine
+        for (int i = 1; i <= 1000; i++) {
             boolean active = i % 2 != 0; // Half active, half inactive
             flags.add(FeatureFlag.builder()
                     .name("Risk_Rule_" + i)
@@ -72,8 +72,8 @@ public class DemoDataInitializer implements ApplicationRunner {
         flags.add(FeatureFlag.builder().name("SPC_API").parentName("Credit_Bureau_Integration").active(false).excludesList(List.of("Serasa_API", "BoaVista_API")).build());
         flags.add(FeatureFlag.builder().name("BoaVista_API").parentName("Credit_Bureau_Integration").active(false).excludesList(List.of("Serasa_API", "SPC_API")).build());
 
-        // 4. Auto_Loan partner integrations
-        for (int i = 1; i <= 20; i++) {
+        // 4. Auto_Loan partner integrations (Stress test with 5000 partners)
+        for (int i = 1; i <= 5000; i++) {
             flags.add(FeatureFlag.builder()
                     .name("Auto_Dealer_Partner_" + i)
                     .parentName("Auto_Loan")
@@ -81,14 +81,14 @@ public class DemoDataInitializer implements ApplicationRunner {
                     .build());
         }
 
-        // 5. Payroll_Loan Public Agencies
-        for (int i = 1; i <= 20; i++) {
+        // 5. Payroll_Loan Public Agencies (Stress test with 5000 agencies)
+        for (int i = 1; i <= 5000; i++) {
             flags.add(FeatureFlag.builder()
                     .name("Public_Agency_" + i)
                     .parentName("Payroll_Loan")
                     .active(false)
                     // Every public agency requires a specific risk rule to be active
-                    .requiresList(List.of("Risk_Rule_" + ((i % 30) + 1)))
+                    .requiresList(List.of("Risk_Rule_" + ((i % 1000) + 1)))
                     .build());
         }
 
