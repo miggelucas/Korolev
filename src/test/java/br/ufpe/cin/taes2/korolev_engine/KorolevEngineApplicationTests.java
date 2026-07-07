@@ -119,9 +119,9 @@ class KorolevEngineApplicationTests {
                     () -> controller.createFlag(child)
             );
 
-            assertTrue(ex.getMessage().contains("Erro de Hierarquia"));
-            assertTrue(ex.getMessage().contains("Theme_Settings"));
-            assertTrue(ex.getMessage().contains("App_UI_Platform"));
+            assertTrue(ex.getErrors().toString().contains("Erro de Hierarquia"));
+            assertTrue(ex.getErrors().toString().contains("Theme_Settings"));
+            assertTrue(ex.getErrors().toString().contains("App_UI_Platform"));
         }
 
         @Test
@@ -135,7 +135,7 @@ class KorolevEngineApplicationTests {
                     () -> controller.deleteFlag("App_UI_Platform")
             );
 
-            assertTrue(ex.getMessage().contains("Erro de Hierarquia"));
+            assertTrue(ex.getErrors().toString().contains("Erro de Hierarquia"));
         }
     }
 
@@ -154,11 +154,11 @@ class KorolevEngineApplicationTests {
             // Try to activate ONLY the parent (leaving the mandatory child inactive)
             FeatureFlagValidationException ex = assertThrows(
                     FeatureFlagValidationException.class,
-                    () -> controller.updateFlagStates(Map.of("App_UI_Platform", true))
+                    () -> controller.updateFlagStates(Map.of("App_UI_Platform", true), false)
             );
 
-            assertTrue(ex.getMessage().contains("Erro de Mandatoriedade"));
-            assertTrue(ex.getMessage().contains("Theme_Settings"));
+            assertTrue(ex.getErrors().toString().contains("Erro de Mandatoriedade"));
+            assertTrue(ex.getErrors().toString().contains("Theme_Settings"));
         }
 
         @Test
@@ -170,7 +170,7 @@ class KorolevEngineApplicationTests {
 
             // Activate both at once — resolves the chicken-and-egg deadlock
             ResponseEntity<Map<String, String>> response = controller.updateFlagStates(
-                    Map.of("App_UI_Platform", true, "Theme_Settings", true)
+                    Map.of("App_UI_Platform", true, "Theme_Settings", true), false
             );
 
             assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -195,7 +195,7 @@ class KorolevEngineApplicationTests {
                     .name("Auto_Dark_Mode")
                     .active(true)
                     .parentName("App_UI_Platform")
-                    .requiresTarget("Theme_Settings")
+                    .requiresList(List.of("Theme_Settings"))
                     .build();
 
             FeatureFlagValidationException ex = assertThrows(
@@ -203,9 +203,9 @@ class KorolevEngineApplicationTests {
                     () -> controller.createFlag(autoDarkMode)
             );
 
-            assertTrue(ex.getMessage().contains("restrição cruzada"));
-            assertTrue(ex.getMessage().contains("Auto_Dark_Mode"));
-            assertTrue(ex.getMessage().contains("Theme_Settings"));
+            assertTrue(ex.getErrors().toString().contains("restrição cruzada"));
+            assertTrue(ex.getErrors().toString().contains("Auto_Dark_Mode"));
+            assertTrue(ex.getErrors().toString().contains("Theme_Settings"));
         }
     }
 
@@ -235,7 +235,7 @@ class KorolevEngineApplicationTests {
                     () -> controller.createFlag(darkTheme)
             );
 
-            assertTrue(ex.getMessage().contains("Exclusividade Mútua"));
+            assertTrue(ex.getErrors().toString().contains("Exclusividade Mútua"));
         }
     }
 
@@ -254,7 +254,7 @@ class KorolevEngineApplicationTests {
 
             FeatureFlagNotFoundException ex = assertThrows(
                     FeatureFlagNotFoundException.class,
-                    () -> controller.updateFlagStates(Map.of("Existing", true, "Ghost", true))
+                    () -> controller.updateFlagStates(Map.of("Existing", true, "Ghost", true), false)
             );
 
             ResponseEntity<ErrorResponse> error = exceptionHandler.handleDomainException(ex);
@@ -263,6 +263,25 @@ class KorolevEngineApplicationTests {
 
             // Existing flag should NOT have been updated (transaction-like behavior)
             assertFalse(repository.findByName("Existing").get().isActive());
+        }
+
+        @Test
+        @DisplayName("Should automatically resolve conflicts in cascade when override is true")
+        void shouldResolveConflictsWhenOverrideIsTrue() {
+            repository.save(FeatureFlag.builder().name("App_UI_Platform").active(true).build());
+            repository.save(FeatureFlag.builder().name("Theme_Settings").active(true)
+                    .parentName("App_UI_Platform").build());
+
+            // Try to deactivate the parent ONLY, with override=true.
+            // This would normally fail because the child is still active, but override=true
+            // should auto-resolve by cascading the deactivation to the child.
+            ResponseEntity<Map<String, String>> response = controller.updateFlagStates(
+                    Map.of("App_UI_Platform", false), true
+            );
+
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+            assertFalse(repository.findByName("App_UI_Platform").get().isActive(), "Parent should be inactive");
+            assertFalse(repository.findByName("Theme_Settings").get().isActive(), "Child should be cascaded to inactive");
         }
     }
 

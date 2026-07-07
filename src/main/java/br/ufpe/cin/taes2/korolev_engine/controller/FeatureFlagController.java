@@ -15,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -46,14 +47,17 @@ public class FeatureFlagController {
     @PutMapping("/states")
     @Operation(
             summary = "Update multiple feature flag states",
-            description = "Performs a bulk state update for the specified feature flags. All constraints are validated on the final configuration, resolving parent-child deadlocks."
+            description = "Performs a bulk state update for the specified feature flags. All constraints are validated on the final configuration, resolving parent-child deadlocks. If override is true, the engine attempts to automatically resolve any constraint violations by toggling states in cascade."
     )
     @ApiResponse(responseCode = "200", description = "States updated successfully")
     @ApiResponse(responseCode = "400", description = "Validation constraint violated by the proposed configuration")
     @ApiResponse(responseCode = "404", description = "One or more feature flags not found")
-    public ResponseEntity<Map<String, String>> updateFlagStates(@RequestBody Map<String, Boolean> states) {
-        log.info("[FeatureFlagController] - Handle bulk state update request - PUT /api/flags/states for {} flags", states.size());
-        useCase.updateFlagStates(states);
+    public ResponseEntity<Map<String, String>> updateFlagStates(
+            @RequestBody Map<String, Boolean> states,
+            @RequestParam(defaultValue = "false") boolean override) {
+        
+        log.info("[FeatureFlagController] - Handle bulk state update request - PUT /api/flags/states for {} flags, override={}", states.size(), override);
+        useCase.updateFlagStates(states, override);
         return ResponseEntity.ok(Map.of("message", "Estados atualizados com sucesso."));
     }
 
@@ -88,25 +92,12 @@ public class FeatureFlagController {
     @DeleteMapping("/{name}")
     @Operation(
             summary = "Delete a feature flag",
-            description = "Validates that removing this flag does not break any active dependency before deleting. Returns HTTP 400 if deletion would violate constraints."
+            description = "Removes a feature flag if its deletion does not violate any hierarchical or cross-tree dependencies."
     )
-    @ApiResponse(responseCode = "200", description = "Flag deleted successfully")
-    @ApiResponse(responseCode = "400", description = "Deletion would break active dependencies")
-    public ResponseEntity<Map<String, String>> deleteFlag(@PathVariable String name) {
+    public ResponseEntity<Void> deleteFlag(@PathVariable String name) {
         log.info("[FeatureFlagController] - Handle delete request - DELETE /api/flags/{}", name);
         useCase.deleteFlag(name);
-        return ResponseEntity.ok(Map.of("message", "Flag removida com sucesso."));
-    }
-
-    @GetMapping(value = "/graph", produces = MediaType.TEXT_PLAIN_VALUE)
-    @Operation(
-            summary = "Render the feature flag dependency graph",
-            description = "Returns an ASCII tree visualization of all feature flags showing their hierarchy, activation status, and constraint annotations."
-    )
-    public ResponseEntity<String> getGraph() {
-        log.info("[FeatureFlagController] - Handle render graph request - GET /api/flags/graph");
-        String graph = useCase.getGraphRepresentation();
-        return ResponseEntity.ok(graph);
+        return ResponseEntity.noContent().build();
     }
 
     private FeatureFlag toDomain(FeatureFlagRequest req) {
@@ -115,8 +106,8 @@ public class FeatureFlagController {
                 .active(req.isActive())
                 .parentName(req.getParentName())
                 .mandatory(req.isMandatory())
-                .requiresTarget(req.getRequiresTarget())
-                .excludesList(req.getExcludesList() != null ? req.getExcludesList() : List.of())
+                .requiresList(req.getRequiresList() != null ? req.getRequiresList() : new ArrayList<>())
+                .excludesList(req.getExcludesList() != null ? req.getExcludesList() : new ArrayList<>())
                 .build();
     }
 
@@ -126,8 +117,8 @@ public class FeatureFlagController {
                 .active(flag.isActive())
                 .parentName(flag.getParentName())
                 .mandatory(flag.isMandatory())
-                .requiresTarget(flag.getRequiresTarget())
-                .excludesList(flag.getExcludesList())
+                .requiresList(flag.getRequiresList() != null ? flag.getRequiresList() : new ArrayList<>())
+                .excludesList(flag.getExcludesList() != null ? flag.getExcludesList() : new ArrayList<>())
                 .build();
     }
 }

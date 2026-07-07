@@ -1,8 +1,7 @@
 package br.ufpe.cin.taes2.korolev_engine.domain.validation;
 
 import br.ufpe.cin.taes2.korolev_engine.domain.model.FeatureFlag;
-import jakarta.xml.bind.ValidationException;
-
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -10,14 +9,32 @@ import java.util.Map;
  * Each implementation encapsulates a single validation concern
  * from the Software Product Line feature model.
  */
-public interface ValidationRule {
+public interface ValidationRule<T> {
 
     /**
-     * Validates the given feature flag state against a specific constraint.
-     * Throws FeatureFlagValidationException if the constraint is violated.
+     * Validates the given entity state against a specific constraint.
+     * Returns a list of validation errors if constraints are violated.
      *
-     * @param flag    the feature flag being evaluated
-     * @param flagMap a snapshot of all flags indexed by name for cross-reference lookups
+     * @param entity  the entity being evaluated
+     * @param contextMap a snapshot of all entities indexed by name for cross-reference lookups
+     * @return a list of errors, or an empty list if valid
      */
-    void validate(FeatureFlag flag, Map<String, FeatureFlag> flagMap);
+    List<ValidationError> validate(T entity, Map<String, T> contextMap);
+
+    /**
+     * Defines the specific error type that this rule enforces.
+     */
+    ErrorType getErrorType();
+
+    /**
+     * Helper method to construct a ValidationError bound to this rule's ErrorType.
+     */
+    default ValidationError buildError(String source, String target, String message) {
+        return ValidationError.builder()
+                .type(getErrorType())
+                .sourceFlag(source)
+                .targetFlag(target)
+                .message(message)
+                .build();
+    }
 }

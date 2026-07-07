@@ -17,6 +17,6 @@ public class FeatureFlagResponse {
     private boolean active;
     private String parentName;
     private boolean mandatory;
-    private String requiresTarget;
+    private List<String> requiresList;
     private List<String> excludesList;
 }

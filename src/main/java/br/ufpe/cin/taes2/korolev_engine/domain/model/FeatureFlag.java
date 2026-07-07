@@ -23,7 +23,8 @@ public class FeatureFlag {
     @Builder.Default
     private boolean mandatory = false;
 
-    private String requiresTarget;
+    @Builder.Default
+    private List<String> requiresList = new ArrayList<>();
     
     @Builder.Default
     private List<String> excludesList = new ArrayList<>();

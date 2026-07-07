@@ -70,8 +70,10 @@ public class UvlService {
         Set<String> printedExcludes = new HashSet<>();
 
         for (FeatureFlag flag : allFlags) {
-            if (flag.getRequiresTarget() != null) {
-                constrBuilder.append("\t").append(flag.getName()).append(" requires ").append(flag.getRequiresTarget()).append("\n");
+            if (flag.getRequiresList() != null) {
+                for (String reqTarget : flag.getRequiresList()) {
+                    constrBuilder.append("\t").append(flag.getName()).append(" requires ").append(reqTarget).append("\n");
+                }
             }
             if (flag.getExcludesList() != null) {
                 for (String exName : flag.getExcludesList()) {
@@ -194,7 +196,9 @@ public class UvlService {
 
             if (source != null && target != null) {
                 if ("requires".equals(relation)) {
-                    source.setRequiresTarget(targetName);
+                    if (!source.getRequiresList().contains(targetName)) {
+                        source.getRequiresList().add(targetName);
+                    }
                 } else if ("excludes".equals(relation)) {
                     if (!source.getExcludesList().contains(targetName)) {
                         source.getExcludesList().add(targetName);

@@ -1,7 +1,6 @@
 package br.ufpe.cin.taes2.korolev_engine.application.usecase;
 
 import br.ufpe.cin.taes2.korolev_engine.domain.model.FeatureFlag;
-import br.ufpe.cin.taes2.korolev_engine.domain.service.GraphService;
 import br.ufpe.cin.taes2.korolev_engine.domain.service.KorolevEngine;
 import br.ufpe.cin.taes2.korolev_engine.infrastructure.repository.FeatureFlagRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +23,6 @@ public class FeatureFlagUseCase {
 
     private final KorolevEngine korolevEngine;
     private final FeatureFlagRepository repository;
-    private final GraphService graphService;
 
     public synchronized void createFlag(FeatureFlag flag) {
         log.info("[FeatureFlagUseCase] - Create flag execution - Creating flag named '{}'", flag.getName());
@@ -36,11 +34,11 @@ public class FeatureFlagUseCase {
         log.info("[FeatureFlagUseCase] - Create flag success - Flag '{}' persisted", flag.getName());
     }
 
-    public synchronized void updateFlagStates(Map<String, Boolean> states) {
-        log.info("[FeatureFlagUseCase] - Update states execution - Updating active states for {} flags", states.size());
+    public synchronized void updateFlagStates(Map<String, Boolean> states, boolean override) {
+        log.info("[FeatureFlagUseCase] - Update states execution - Updating active states for {} flags, override={}", states.size(), override);
 
         List<FeatureFlag> currentState = repository.findAll();
-        List<FeatureFlag> updatedFlags = korolevEngine.validateStateUpdate(states, currentState);
+        List<FeatureFlag> updatedFlags = korolevEngine.validateStateUpdate(states, currentState, override);
 
         for (FeatureFlag flag : updatedFlags) {
             repository.save(flag);
@@ -67,10 +65,5 @@ public class FeatureFlagUseCase {
     public Optional<FeatureFlag> getFlagByName(String name) {
         log.debug("[FeatureFlagUseCase] - Get flag by name execution - Fetch flag by name '{}'", name);
         return repository.findByName(name);
-    }
-
-    public String getGraphRepresentation() {
-        log.debug("[FeatureFlagUseCase] - Get graph execution - Get ASCII graph representation");
-        return graphService.renderGraph();
     }
 }

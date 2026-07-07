@@ -23,10 +23,10 @@ import static org.mockito.Mockito.*;
 class KorolevEngineUnitTest {
 
     @Mock
-    private ValidationRule rule1;
+    private ValidationRule<FeatureFlag> rule1;
 
     @Mock
-    private ValidationRule rule2;
+    private ValidationRule<FeatureFlag> rule2;
 
     private KorolevEngine engine;
 
@@ -60,8 +60,11 @@ class KorolevEngineUnitTest {
     void shouldFailCreation_WhenValidationRuleFails() {
         FeatureFlag flag = FeatureFlag.builder().name("BadFlag").active(true).build();
 
-        doThrow(new FeatureFlagValidationException("Validation Failed"))
-                .when(rule1).validate(eq(flag), anyMap());
+        br.ufpe.cin.taes2.korolev_engine.domain.validation.ValidationError err = br.ufpe.cin.taes2.korolev_engine.domain.validation.ValidationError.builder()
+                .type(br.ufpe.cin.taes2.korolev_engine.domain.validation.ErrorType.SEMANTIC)
+                .message("Validation Failed")
+                .build();
+        when(rule1.validate(eq(flag), anyMap())).thenReturn(List.of(err));
 
         assertThrows(FeatureFlagValidationException.class,
                 () -> engine.validateCreation(flag, Collections.emptyList()));
@@ -76,7 +79,8 @@ class KorolevEngineUnitTest {
 
         List<FeatureFlag> result = engine.validateStateUpdate(
                 Map.of("F1", true, "F2", true),
-                List.of(flag1, flag2)
+                List.of(flag1, flag2),
+                false
         );
 
         assertEquals(2, result.size());
@@ -88,7 +92,67 @@ class KorolevEngineUnitTest {
         FeatureFlag flag = FeatureFlag.builder().name("F1").active(false).build();
 
         assertThrows(FeatureFlagNotFoundException.class,
-                () -> engine.validateStateUpdate(Map.of("F1", true, "Ghost", true), List.of(flag)));
+                () -> engine.validateStateUpdate(Map.of("F1", true, "Ghost", true), List.of(flag), false));
+    }
+
+    // ── Auto-Resolution (Override) ───────────────────────────────────
+
+    @Test
+    void shouldAutoResolveHierarchyConflict_WhenOverrideIsTrue() {
+        FeatureFlag parent = FeatureFlag.builder().name("Parent").active(true).build();
+        FeatureFlag child = FeatureFlag.builder().name("Child").active(true).parentName("Parent").build();
+
+        // Simulate Hierarchy Error: Child is active but Parent is being set to false
+        br.ufpe.cin.taes2.korolev_engine.domain.validation.ValidationError err = br.ufpe.cin.taes2.korolev_engine.domain.validation.ValidationError.builder()
+                .type(br.ufpe.cin.taes2.korolev_engine.domain.validation.ErrorType.HIERARCHY)
+                .sourceFlag("Child")
+                .targetFlag("Parent")
+                .message("Broken hierarchy")
+                .build();
+                
+        // 1st iteration: rule returns error. 2nd iteration: rule returns empty
+        when(rule1.validate(any(FeatureFlag.class), anyMap()))
+            .thenReturn(List.of(err))
+            .thenReturn(Collections.emptyList());
+
+        List<FeatureFlag> result = engine.validateStateUpdate(
+                Map.of("Parent", false),
+                List.of(parent, child),
+                true
+        );
+
+        // Auto-resolution should have cascaded the 'false' to the Child
+        FeatureFlag updatedChild = result.stream().filter(f -> f.getName().equals("Child")).findFirst().get();
+        assertFalse(updatedChild.isActive());
+    }
+
+    @Test
+    void shouldAutoResolveMandatoryConflict_WhenOverrideIsTrue() {
+        FeatureFlag parent = FeatureFlag.builder().name("Parent").active(false).build();
+        FeatureFlag child = FeatureFlag.builder().name("Child").active(false).parentName("Parent").mandatory(true).build();
+
+        // Simulate Mandatory Error: Parent is active, but Mandatory Child is inactive
+        br.ufpe.cin.taes2.korolev_engine.domain.validation.ValidationError err = br.ufpe.cin.taes2.korolev_engine.domain.validation.ValidationError.builder()
+                .type(br.ufpe.cin.taes2.korolev_engine.domain.validation.ErrorType.MANDATORY)
+                .sourceFlag("Parent")
+                .targetFlag("Child")
+                .message("Missing mandatory child")
+                .build();
+                
+        // 1st iteration: error. 2nd iteration: empty
+        when(rule1.validate(any(FeatureFlag.class), anyMap()))
+            .thenReturn(List.of(err))
+            .thenReturn(Collections.emptyList());
+
+        List<FeatureFlag> result = engine.validateStateUpdate(
+                Map.of("Parent", true),
+                List.of(parent, child),
+                true
+        );
+
+        // Auto-resolution should have cascaded the 'true' to the Child
+        FeatureFlag updatedChild = result.stream().filter(f -> f.getName().equals("Child")).findFirst().get();
+        assertTrue(updatedChild.isActive());
     }
 
     // ── Deletion ─────────────────────────────────────────────────────
@@ -105,8 +169,11 @@ class KorolevEngineUnitTest {
         FeatureFlag parent = FeatureFlag.builder().name("Parent").active(true).build();
         FeatureFlag child = FeatureFlag.builder().name("Child").active(true).parentName("Parent").build();
 
-        doThrow(new FeatureFlagValidationException("Broken hierarchy"))
-                .when(rule1).validate(eq(child), anyMap());
+        br.ufpe.cin.taes2.korolev_engine.domain.validation.ValidationError err = br.ufpe.cin.taes2.korolev_engine.domain.validation.ValidationError.builder()
+                .type(br.ufpe.cin.taes2.korolev_engine.domain.validation.ErrorType.HIERARCHY)
+                .message("Broken hierarchy")
+                .build();
+        when(rule1.validate(eq(child), anyMap())).thenReturn(List.of(err));
 
         assertThrows(FeatureFlagValidationException.class,
                 () -> engine.validateDeletion("Parent", List.of(parent, child)));

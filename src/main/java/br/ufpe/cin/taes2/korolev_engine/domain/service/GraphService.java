@@ -101,8 +101,8 @@ public class GraphService {
         if (flag.isMandatory()) {
             annotations.add("mandatory");
         }
-        if (flag.getRequiresTarget() != null) {
-            annotations.add("requires: " + flag.getRequiresTarget());
+        if (flag.getRequiresList() != null && !flag.getRequiresList().isEmpty()) {
+            annotations.add("requires: " + String.join(", ", flag.getRequiresList()));
         }
         if (flag.getExcludesList() != null && !flag.getExcludesList().isEmpty()) {
             annotations.add("excludes: " + String.join(", ", flag.getExcludesList()));

@@ -35,13 +35,19 @@ public class GlobalExceptionHandler {
             errorCode = "VALIDATION_ERROR";
         }
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
+        ErrorResponse.ErrorResponseBuilder responseBuilder = ErrorResponse.builder()
                 .errorCode(errorCode)
                 .message(ex.getMessage())
-                .timestamp(LocalDateTime.now())
-                .build();
+                .timestamp(LocalDateTime.now());
 
-        return ResponseEntity.status(status).body(errorResponse);
+        if (ex instanceof FeatureFlagValidationException) {
+            FeatureFlagValidationException validationEx = (FeatureFlagValidationException) ex;
+            if (validationEx.getErrors() != null && !validationEx.getErrors().isEmpty()) {
+                responseBuilder.errors(validationEx.getErrors());
+            }
+        }
+
+        return ResponseEntity.status(status).body(responseBuilder.build());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

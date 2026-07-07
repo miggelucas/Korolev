@@ -66,7 +66,7 @@ class UvlServiceUnitTest {
         assertTrue(autoDark.isPresent());
         assertEquals("Theme_Settings", autoDark.get().getParentName());
         assertFalse(autoDark.get().isMandatory());
-        assertEquals("Theme_Settings", autoDark.get().getRequiresTarget());
+        assertTrue(autoDark.get().getRequiresList().contains("Theme_Settings"));
 
         // 4. Alternative siblings
         Optional<FeatureFlag> light = repository.findByName("Light_Theme");
@@ -89,7 +89,7 @@ class UvlServiceUnitTest {
         // Setup a repository state
         FeatureFlag root = FeatureFlag.builder().name("Root").parentName(null).active(true).build();
         FeatureFlag child1 = FeatureFlag.builder().name("MandatoryChild").parentName("Root").mandatory(true).active(true).build();
-        FeatureFlag child2 = FeatureFlag.builder().name("OptionalChild").parentName("Root").mandatory(false).active(false).requiresTarget("MandatoryChild").build();
+        FeatureFlag child2 = FeatureFlag.builder().name("OptionalChild").parentName("Root").mandatory(false).active(false).requiresList(List.of("MandatoryChild")).build();
         
         repository.save(root);
         repository.save(child1);

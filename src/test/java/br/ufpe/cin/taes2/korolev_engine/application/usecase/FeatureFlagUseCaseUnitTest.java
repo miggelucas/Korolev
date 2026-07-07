@@ -27,9 +27,6 @@ class FeatureFlagUseCaseUnitTest {
     @Mock
     private FeatureFlagRepository repository;
 
-    @Mock
-    private GraphService graphService;
-
     @InjectMocks
     private FeatureFlagUseCase useCase;
 
@@ -54,14 +51,15 @@ class FeatureFlagUseCaseUnitTest {
                 FeatureFlag.builder().name("F1").active(false).build()
         );
         FeatureFlag updatedFlag = FeatureFlag.builder().name("F1").active(true).build();
+        List<FeatureFlag> updatedFlags = List.of(updatedFlag);
 
         when(repository.findAll()).thenReturn(currentState);
-        when(korolevEngine.validateStateUpdate(states, currentState)).thenReturn(List.of(updatedFlag));
+        when(korolevEngine.validateStateUpdate(states, currentState, false)).thenReturn(updatedFlags);
 
-        useCase.updateFlagStates(states);
+        useCase.updateFlagStates(states, false);
 
         verify(repository, times(1)).findAll();
-        verify(korolevEngine, times(1)).validateStateUpdate(states, currentState);
+        verify(korolevEngine, times(1)).validateStateUpdate(states, currentState, false);
         verify(repository, times(1)).save(updatedFlag);
     }
 
@@ -104,15 +102,5 @@ class FeatureFlagUseCaseUnitTest {
 
         assertTrue(result.isPresent());
         assertEquals(expectedFlag, result.get());
-    }
-
-    @Test
-    void shouldCallGraphService_WhenGettingGraphRepresentation() {
-        String expectedGraph = "Graph Representation";
-        when(graphService.renderGraph()).thenReturn(expectedGraph);
-
-        String result = useCase.getGraphRepresentation();
-
-        assertEquals(expectedGraph, result);
     }
 }

@@ -1,10 +1,10 @@
 package br.ufpe.cin.taes2.korolev_engine.domain.validation;
 
-import br.ufpe.cin.taes2.korolev_engine.domain.exception.FeatureFlagValidationException;
 import br.ufpe.cin.taes2.korolev_engine.domain.model.FeatureFlag;
+import br.ufpe.cin.taes2.korolev_engine.domain.validation.rules.*;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +12,30 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ValidationRulesUnitTest {
+
+    @Test
+    @DisplayName("SemanticRule should fail if a flag requires itself")
+    void testSemanticRuleSelfRequirement() {
+        SemanticValidationRule rule = new SemanticValidationRule();
+        FeatureFlag flag = FeatureFlag.builder().name("SelfFlag").requiresList(List.of("SelfFlag")).build();
+        Map<String, FeatureFlag> state = new HashMap<>();
+        
+        List<ValidationError> errors = rule.validate(flag, state);
+        assertFalse(errors.isEmpty());
+        assertTrue(errors.get(0).getMessage().contains("não pode requerer a si mesma"));
+    }
+
+    @Test
+    @DisplayName("SemanticRule should fail if a flag requires its parent")
+    void testSemanticRuleParentRequirement() {
+        SemanticValidationRule rule = new SemanticValidationRule();
+        FeatureFlag flag = FeatureFlag.builder().name("ChildFlag").parentName("ParentFlag").requiresList(List.of("ParentFlag")).build();
+        Map<String, FeatureFlag> state = new HashMap<>();
+        
+        List<ValidationError> errors = rule.validate(flag, state);
+        assertFalse(errors.isEmpty());
+        assertTrue(errors.get(0).getMessage().contains("dependência já é garantida pela hierarquia"));
+    }
 
     // --- HierarchyRule Tests ---
 
@@ -26,7 +50,7 @@ class ValidationRulesUnitTest {
         state.put("Parent", parent);
         state.put("Child", child);
 
-        assertDoesNotThrow(() -> rule.validate(child, state));
+        assertTrue(rule.validate(child, state).isEmpty());
     }
 
     @Test
@@ -40,7 +64,7 @@ class ValidationRulesUnitTest {
         state.put("Parent", parent);
         state.put("Child", child);
 
-        assertDoesNotThrow(() -> rule.validate(child, state));
+        assertTrue(rule.validate(child, state).isEmpty());
     }
 
     @Test
@@ -54,7 +78,7 @@ class ValidationRulesUnitTest {
         state.put("Parent", parent);
         state.put("Child", child);
 
-        assertThrows(FeatureFlagValidationException.class, () -> rule.validate(child, state));
+        assertFalse(rule.validate(child, state).isEmpty());
     }
 
     // --- MandatoryRule Tests ---
@@ -70,7 +94,7 @@ class ValidationRulesUnitTest {
         state.put("Parent", parent);
         state.put("Child", child);
 
-        assertDoesNotThrow(() -> rule.validate(child, state));
+        assertTrue(rule.validate(child, state).isEmpty());
     }
 
     @Test
@@ -84,7 +108,7 @@ class ValidationRulesUnitTest {
         state.put("Parent", parent);
         state.put("Child", child);
 
-        assertThrows(FeatureFlagValidationException.class, () -> rule.validate(child, state));
+        assertFalse(rule.validate(child, state).isEmpty());
     }
 
     // --- CrossTreeRequiresRule Tests ---
@@ -94,13 +118,13 @@ class ValidationRulesUnitTest {
         CrossTreeRequiresRule rule = new CrossTreeRequiresRule();
         
         FeatureFlag target = FeatureFlag.builder().name("Target").active(true).build();
-        FeatureFlag flag = FeatureFlag.builder().name("Flag").active(true).requiresTarget("Target").build();
+        FeatureFlag flag = FeatureFlag.builder().name("Flag").active(true).requiresList(List.of("Target")).build();
 
         Map<String, FeatureFlag> state = new HashMap<>();
         state.put("Target", target);
         state.put("Flag", flag);
 
-        assertDoesNotThrow(() -> rule.validate(flag, state));
+        assertTrue(rule.validate(flag, state).isEmpty());
     }
 
     @Test
@@ -108,17 +132,17 @@ class ValidationRulesUnitTest {
         CrossTreeRequiresRule rule = new CrossTreeRequiresRule();
         
         FeatureFlag target = FeatureFlag.builder().name("Target").active(false).build();
-        FeatureFlag flag = FeatureFlag.builder().name("Flag").active(true).requiresTarget("Target").build();
+        FeatureFlag flag = FeatureFlag.builder().name("Flag").active(true).requiresList(List.of("Target")).build();
 
         Map<String, FeatureFlag> state = new HashMap<>();
         state.put("Target", target);
         state.put("Flag", flag);
 
-        assertThrows(FeatureFlagValidationException.class, () -> rule.validate(flag, state));
+        assertFalse(rule.validate(flag, state).isEmpty());
         
         // Missing target
         state.remove("Target");
-        assertThrows(FeatureFlagValidationException.class, () -> rule.validate(flag, state));
+        assertFalse(rule.validate(flag, state).isEmpty());
     }
 
     // --- MutualExclusionRule Tests ---
@@ -134,7 +158,7 @@ class ValidationRulesUnitTest {
         state.put("B", excluded);
         state.put("A", flag);
 
-        assertDoesNotThrow(() -> rule.validate(flag, state));
+        assertTrue(rule.validate(flag, state).isEmpty());
     }
 
     @Test
@@ -148,6 +172,6 @@ class ValidationRulesUnitTest {
         state.put("B", excluded);
         state.put("A", flag);
 
-        assertThrows(FeatureFlagValidationException.class, () -> rule.validate(flag, state));
+        assertFalse(rule.validate(flag, state).isEmpty());
     }
 }

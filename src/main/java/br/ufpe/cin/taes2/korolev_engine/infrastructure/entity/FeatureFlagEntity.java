@@ -24,7 +24,8 @@ public class FeatureFlagEntity {
     private boolean active;
     private String parentName;
     private boolean mandatory;
-    private String requiresTarget;
+    @Builder.Default
+    private List<String> requiresList = new ArrayList<>();
 
     @Builder.Default
     private List<String> excludesList = new ArrayList<>();
@@ -35,7 +36,7 @@ public class FeatureFlagEntity {
                 .active(flag.isActive())
                 .parentName(flag.getParentName())
                 .mandatory(flag.isMandatory())
-                .requiresTarget(flag.getRequiresTarget())
+                .requiresList(flag.getRequiresList() != null ? new ArrayList<>(flag.getRequiresList()) : new ArrayList<>())
                 .excludesList(flag.getExcludesList() != null ? new ArrayList<>(flag.getExcludesList()) : new ArrayList<>())
                 .build();
     }
@@ -46,7 +47,7 @@ public class FeatureFlagEntity {
                 .active(this.active)
                 .parentName(this.parentName)
                 .mandatory(this.mandatory)
-                .requiresTarget(this.requiresTarget)
+                .requiresList(this.requiresList != null ? new ArrayList<>(this.requiresList) : new ArrayList<>())
                 .excludesList(this.excludesList != null ? new ArrayList<>(this.excludesList) : new ArrayList<>())
                 .build();
     }
