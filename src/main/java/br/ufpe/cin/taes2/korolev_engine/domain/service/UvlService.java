@@ -1,9 +1,6 @@
 package br.ufpe.cin.taes2.korolev_engine.domain.service;
 
 import br.ufpe.cin.taes2.korolev_engine.domain.model.FeatureFlag;
-import br.ufpe.cin.taes2.korolev_engine.domain.service.engine.KorolevEngine;
-import br.ufpe.cin.taes2.korolev_engine.infrastructure.repository.FeatureFlagRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -17,36 +14,13 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class UvlService {
 
-    private final FeatureFlagRepository repository;
-    private final KorolevEngine korolevEngine;
-
     /**
-     * Imports a UVL format feature model, validates it, and replaces the current repository state if valid.
+     * Exports the provided feature flags into a standardized UVL string.
      */
-    public synchronized void importUvl(String uvlContent) {
-        log.info("[UvlService] - Import UVL - Starting parsing of UVL content");
-        List<FeatureFlag> parsedFlags = parseUvl(uvlContent);
-
-        log.info("[UvlService] - Import UVL - Validating integrity of {} parsed flags", parsedFlags.size());
-        // Run global consistency check on the parsed state before writing
-        korolevEngine.validateGlobalState(parsedFlags);
-
-        log.info("[UvlService] - Import UVL - Validation passed. Committing imported flags to repository.");
-        repository.clear();
-        for (FeatureFlag flag : parsedFlags) {
-            repository.save(flag);
-        }
-    }
-
-    /**
-     * Exports the current repository state of feature flags into a standardized UVL string.
-     */
-    public String exportUvl() {
-        log.info("[UvlService] - Export UVL - Building UVL string from repository");
-        List<FeatureFlag> allFlags = repository.findAll();
+    public String exportUvl(List<FeatureFlag> allFlags) {
+        log.info("[UvlService] - Export UVL - Building UVL string");
         if (allFlags.isEmpty()) {
             return "features\n";
         }
@@ -58,12 +32,12 @@ public class UvlService {
         List<FeatureFlag> roots = allFlags.stream()
                 .filter(f -> f.getParentName() == null)
                 .sorted(Comparator.comparing(FeatureFlag::getName))
-                .collect(Collectors.toList());
+                .toList();
 
         StringBuilder sb = new StringBuilder();
         sb.append("features\n");
         for (FeatureFlag root : roots) {
-            exportNode(sb, root, 1, childrenMap, allFlags);
+            exportNode(sb, root, 1, childrenMap);
         }
 
         // Cross-Tree Constraints
@@ -94,14 +68,14 @@ public class UvlService {
             }
         }
 
-        if (constrBuilder.length() > 0) {
+        if (!constrBuilder.isEmpty()) {
             sb.append("\nconstraints\n").append(constrBuilder);
         }
 
         return sb.toString();
     }
 
-    private List<FeatureFlag> parseUvl(String content) {
+    public List<FeatureFlag> parseUvl(String content) {
         List<FeatureFlag> flags = new ArrayList<>();
         Map<String, FeatureFlag> flagMap = new HashMap<>();
 
@@ -127,13 +101,13 @@ public class UvlService {
             if ("features".equals(currentSection)) {
                 int indent = getIndent(line);
 
-                while (!stack.isEmpty() && stack.get(stack.size() - 1).spaces >= indent) {
-                    stack.remove(stack.size() - 1);
+                while (!stack.isEmpty() && stack.getLast().spaces >= indent) {
+                    stack.removeLast();
                 }
 
                 if (isGroupKeyword(trimmed)) {
                     if (!stack.isEmpty()) {
-                        stack.get(stack.size() - 1).groupType = trimmed.toLowerCase();
+                        stack.getLast().groupType = trimmed.toLowerCase();
                     }
                 } else {
                     String name = cleanFeatureName(trimmed);
@@ -141,7 +115,7 @@ public class UvlService {
                     FeatureFlag parent = null;
                     String groupType = "";
                     if (!stack.isEmpty()) {
-                        IndentLevel parentLevel = stack.get(stack.size() - 1);
+                        IndentLevel parentLevel = stack.getLast();
                         parent = parentLevel.feature;
                         groupType = parentLevel.groupType;
                     }
@@ -241,7 +215,7 @@ public class UvlService {
         return text.trim();
     }
 
-    private void exportNode(StringBuilder sb, FeatureFlag node, int indent, Map<String, List<FeatureFlag>> childrenMap, List<FeatureFlag> allFlags) {
+    private void exportNode(StringBuilder sb, FeatureFlag node, int indent, Map<String, List<FeatureFlag>> childrenMap) {
         indentTabs(sb, indent);
         sb.append(node.getName()).append("\n");
 
@@ -271,7 +245,7 @@ public class UvlService {
             sb.append("mandatory\n");
             mandatoryGroup.sort(Comparator.comparing(FeatureFlag::getName));
             for (FeatureFlag child : mandatoryGroup) {
-                exportNode(sb, child, indent + 2, childrenMap, allFlags);
+                exportNode(sb, child, indent + 2, childrenMap);
             }
         }
 
@@ -280,7 +254,7 @@ public class UvlService {
             sb.append("alternative\n");
             alternativeGroup.sort(Comparator.comparing(FeatureFlag::getName));
             for (FeatureFlag child : alternativeGroup) {
-                exportNode(sb, child, indent + 2, childrenMap, allFlags);
+                exportNode(sb, child, indent + 2, childrenMap);
             }
         }
 
@@ -289,7 +263,7 @@ public class UvlService {
             sb.append("optional\n");
             optionalGroup.sort(Comparator.comparing(FeatureFlag::getName));
             for (FeatureFlag child : optionalGroup) {
-                exportNode(sb, child, indent + 2, childrenMap, allFlags);
+                exportNode(sb, child, indent + 2, childrenMap);
             }
         }
     }
@@ -325,9 +299,7 @@ public class UvlService {
     }
 
     private void indentTabs(StringBuilder sb, int count) {
-        for (int i = 0; i < count; i++) {
-            sb.append("\t");
-        }
+        sb.repeat("\t", Math.max(0, count));
     }
 
     private static class IndentLevel {

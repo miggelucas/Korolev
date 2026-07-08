@@ -1,8 +1,6 @@
 package br.ufpe.cin.taes2.korolev_engine.domain.service;
 
 import br.ufpe.cin.taes2.korolev_engine.domain.model.FeatureFlag;
-import br.ufpe.cin.taes2.korolev_engine.infrastructure.repository.FeatureFlagRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -12,17 +10,13 @@ import java.util.stream.Collectors;
  * Generates an ASCII tree representation of the current feature flag graph.
  */
 @Service
-@RequiredArgsConstructor
 public class GraphService {
-
-    private final FeatureFlagRepository repository;
 
     /**
      * Builds a full ASCII tree string of all registered feature flags,
      * grouped by their parent-child hierarchy.
      */
-    public String renderGraph() {
-        List<FeatureFlag> allFlags = repository.findAll();
+    public String renderGraph(List<FeatureFlag> allFlags) {
 
         if (allFlags.isEmpty()) {
             return "(empty graph — no feature flags registered)";
@@ -37,7 +31,7 @@ public class GraphService {
         List<FeatureFlag> roots = allFlags.stream()
                 .filter(f -> f.getParentName() == null)
                 .sorted(Comparator.comparing(FeatureFlag::getName))
-                .collect(Collectors.toList());
+                .toList();
 
         // Find orphan nodes (parent declared but parent not in the graph)
         Set<String> allNames = allFlags.stream()
@@ -47,7 +41,7 @@ public class GraphService {
         List<FeatureFlag> orphans = allFlags.stream()
                 .filter(f -> f.getParentName() != null && !allNames.contains(f.getParentName()))
                 .sorted(Comparator.comparing(FeatureFlag::getName))
-                .collect(Collectors.toList());
+                .toList();
 
         StringBuilder sb = new StringBuilder();
         sb.append("Feature Flag Graph\n");
